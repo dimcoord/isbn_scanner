@@ -4,6 +4,7 @@ import '../models/api_config.dart';
 import '../models/book.dart';
 import '../services/api_sender_service.dart';
 import '../services/history_service.dart';
+import '../theme/app_theme.dart';
 import 'api_settings_screen.dart';
 
 class BookReviewScreen extends StatefulWidget {
@@ -194,23 +195,23 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.check_circle_outline, color: Colors.green, size: 52),
-        title: const Text('Successfully Sent!'),
+        icon: const Icon(Icons.check_circle_outline, color: AppColors.statusSent, size: 52),
+        title: const Text('Berhasil Terkirim!'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '"${book.title}" was successfully submitted to your API.',
-              style: const TextStyle(fontSize: 14),
+              '"${book.title}" berhasil disimpan dan dikirim ke server perpustakaan.',
+              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: AppColors.statusSentBg,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
+                border: Border.all(color: AppColors.statusSentBorder),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,13 +220,13 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                     'Status: ${result.statusCode ?? 200} OK',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Colors.green,
+                      color: AppColors.statusSent,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Endpoint: ${_apiConfig.httpMethod} ${_apiConfig.endpointUrl}',
-                    style: const TextStyle(fontSize: 11, color: Colors.black54),
+                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -240,7 +241,7 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
               Navigator.of(ctx).pop();
               Navigator.of(context).pop(book);
             },
-            child: const Text('Done'),
+            child: const Text('Selesai'),
           ),
           FilledButton.icon(
             onPressed: () {
@@ -248,7 +249,7 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
               Navigator.of(context).pop(book);
             },
             icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('Scan Next Book'),
+            label: const Text('Scan Buku Baru'),
           ),
         ],
       ),
@@ -259,21 +260,21 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.error_outline, color: Colors.red, size: 52),
-        title: const Text('Failed to Send'),
+        icon: const Icon(Icons.error_outline, color: AppColors.statusFailed, size: 52),
+        title: const Text('Gagal Mengirim Data'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                result.errorMessage ?? 'An error occurred while connecting to the API.',
-                style: const TextStyle(color: Colors.red, fontSize: 13),
+                result.errorMessage ?? 'Terjadi kesalahan saat menghubungi server API.',
+                style: const TextStyle(color: AppColors.statusFailed, fontSize: 13),
               ),
               const SizedBox(height: 12),
               Text(
                 'Endpoint: ${_apiConfig.httpMethod} ${_apiConfig.endpointUrl}',
-                style: const TextStyle(fontSize: 12, color: Colors.black54),
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
               if (_apiConfig.endpointUrl.contains('127.0.0.1') ||
                   _apiConfig.endpointUrl.contains('localhost')) ...[
@@ -281,27 +282,28 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
+                    color: AppColors.statusPendingBg,
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.amber.shade300),
+                    border: Border.all(color: AppColors.statusPendingBorder),
                   ),
                   child: const Text(
-                    '💡 Emulator Tip: If using the Android Emulator, change "127.0.0.1" to "10.0.2.2" in API Settings, or run "adb reverse tcp:8000 tcp:8000".',
-                    style: TextStyle(fontSize: 11, color: Colors.black87),
+                    '💡 Tips Emulator: Jika menggunakan Android Emulator, gunakan "10.0.2.2" sebagai pengganti "127.0.0.1", atau jalankan "adb reverse tcp:8000 tcp:8000".',
+                    style: TextStyle(fontSize: 11, color: AppColors.statusPending),
                   ),
                 ),
               ],
               if (result.responseBody != null && result.responseBody!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 const Text(
-                  'Response Body:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  'Respon Server:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary),
                 ),
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: AppColors.background,
                     borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Text(
                     result.responseBody!,
@@ -315,14 +317,14 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Close'),
+            child: const Text('Tutup'),
           ),
           FilledButton(
             onPressed: () {
               Navigator.of(ctx).pop();
               _sendToApi();
             },
-            child: const Text('Retry'),
+            child: const Text('Coba Lagi'),
           ),
         ],
       ),
@@ -331,16 +333,15 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final book = widget.initialBook;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Review Book Data'),
+        title: const Text('Review Data Buku'),
         actions: [
           IconButton(
             icon: const Icon(Icons.bookmark_border),
-            tooltip: 'Save Draft Only',
+            tooltip: 'Simpan Draft Saja',
             onPressed: _isSending ? null : _saveDraftOnly,
           ),
         ],
@@ -354,12 +355,13 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                 children: [
                   // Book Card Header with cover
                   Card(
-                    elevation: 1,
+                    elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: AppColors.border, width: 1),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(14),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -368,17 +370,17 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                             child: Container(
                               width: 80,
                               height: 115,
-                              color: Colors.grey.shade200,
+                              color: AppColors.primaryLight,
                               child: _coverImageController.text.isNotEmpty
                                   ? Image.network(
                                       _coverImageController.text,
                                       fit: BoxFit.cover,
                                       errorBuilder: (_, _, _) => const Center(
-                                        child: Icon(Icons.book, size: 40, color: Colors.grey),
+                                        child: Icon(Icons.menu_book, size: 36, color: AppColors.primary),
                                       ),
                                     )
                                   : const Center(
-                                      child: Icon(Icons.book, size: 40, color: Colors.grey),
+                                      child: Icon(Icons.menu_book, size: 36, color: AppColors.primary),
                                     ),
                             ),
                           ),
@@ -388,43 +390,69 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  book.title,
-                                  style: theme.textTheme.titleMedium?.copyWith(
+                                  book.title.isNotEmpty ? book.title : '(Judul Belum Diisi)',
+                                  style: const TextStyle(
+                                    fontSize: 15,
                                     fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  book.authorsFormatted,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: Colors.black87,
+                                  book.authorsFormatted.isNotEmpty ? book.authorsFormatted : 'Penulis tidak diketahui',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 10),
                                 Wrap(
                                   spacing: 6,
                                   runSpacing: 4,
                                   children: [
-                                    Chip(
-                                      label: Text(
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primaryLight,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: AppColors.primary.withAlpha(60)),
+                                      ),
+                                      child: Text(
                                         'ISBN: ${book.primaryIsbn}',
-                                        style: const TextStyle(fontSize: 11),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontFamily: 'monospace',
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.primaryDark,
+                                        ),
                                       ),
-                                      visualDensity: VisualDensity.compact,
-                                      padding: EdgeInsets.zero,
                                     ),
-                                    Chip(
-                                      avatar: const Icon(Icons.cloud_done, size: 14),
-                                      label: Text(
-                                        widget.fetchSource,
-                                        style: const TextStyle(fontSize: 11),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.background,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: AppColors.border),
                                       ),
-                                      visualDensity: VisualDensity.compact,
-                                      padding: EdgeInsets.zero,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.cloud_done, size: 12, color: AppColors.primary),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            widget.fetchSource,
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -442,34 +470,35 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer.withAlpha(50),
+                      color: AppColors.primaryLight,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: theme.colorScheme.primary.withAlpha(80),
+                        color: AppColors.primary.withAlpha(80),
                       ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.output, size: 20, color: Colors.blueAccent),
+                        const Icon(Icons.cloud_upload_outlined, size: 20, color: AppColors.primary),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Target API Endpoint:',
+                                'Target API Perpustakaan:',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black54,
+                                  color: AppColors.primaryDark,
                                 ),
                               ),
                               Text(
                                 '${_apiConfig.httpMethod} ${_apiConfig.endpointUrl}',
                                 style: const TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   fontFamily: 'monospace',
                                   fontWeight: FontWeight.w600,
+                                  color: AppColors.primaryDarker,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -486,31 +515,32 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                             );
                             _loadApiConfig();
                           },
-                          child: const Text('Change'),
+                          child: const Text('Ubah'),
                         ),
                       ],
                     ),
                   ),
 
-                  const SizedBox(height: 16),
-                  Text(
-                    'Book Details',
-                    style: theme.textTheme.titleSmall?.copyWith(
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Informasi Buku',
+                    style: TextStyle(
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
 
                   // ISBN
                   TextFormField(
                     controller: _isbnController,
                     decoration: const InputDecoration(
-                      labelText: 'ISBN *',
+                      labelText: 'Nomor ISBN *',
                       prefixIcon: Icon(Icons.numbers),
-                      border: OutlineInputBorder(),
                     ),
                     validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'ISBN is required' : null,
+                        v == null || v.trim().isEmpty ? 'ISBN wajib diisi' : null,
                   ),
                   const SizedBox(height: 12),
 
@@ -518,12 +548,11 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                   TextFormField(
                     controller: _titleController,
                     decoration: const InputDecoration(
-                      labelText: 'Title *',
+                      labelText: 'Judul Buku *',
                       prefixIcon: Icon(Icons.title),
-                      border: OutlineInputBorder(),
                     ),
                     validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Title is required' : null,
+                        v == null || v.trim().isEmpty ? 'Judul buku wajib diisi' : null,
                   ),
                   const SizedBox(height: 12),
 
@@ -531,12 +560,11 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                   TextFormField(
                     controller: _authorController,
                     decoration: const InputDecoration(
-                      labelText: 'Author *',
+                      labelText: 'Penulis / Pengarang *',
                       prefixIcon: Icon(Icons.person),
-                      border: OutlineInputBorder(),
                     ),
                     validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Author is required' : null,
+                        v == null || v.trim().isEmpty ? 'Penulis wajib diisi' : null,
                   ),
                   const SizedBox(height: 12),
 
@@ -548,9 +576,8 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                         child: TextFormField(
                           controller: _publisherController,
                           decoration: const InputDecoration(
-                            labelText: 'Publisher',
+                            labelText: 'Penerbit',
                             prefixIcon: Icon(Icons.business),
-                            border: OutlineInputBorder(),
                           ),
                         ),
                       ),
@@ -560,29 +587,30 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                         child: TextFormField(
                           controller: _yearController,
                           decoration: const InputDecoration(
-                            labelText: 'Year *',
+                            labelText: 'Tahun Terbit *',
                             prefixIcon: Icon(Icons.calendar_today),
-                            border: OutlineInputBorder(),
                           ),
                           keyboardType: TextInputType.number,
                           validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Year is required';
-                            if (int.tryParse(v.trim()) == null) return 'Invalid year';
+                            if (v == null || v.trim().isEmpty) return 'Wajib diisi';
+                            if (int.tryParse(v.trim()) == null) return 'Harus angka';
                             return null;
                           },
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
-                  Text(
-                    'Inventory & Shelf Placement',
-                    style: theme.textTheme.titleSmall?.copyWith(
+                  const Text(
+                    'Inventaris & Penempatan Rak',
+                    style: TextStyle(
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
 
                   // Category ID, Rack Location, Stock
                   Row(
@@ -591,14 +619,13 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                         child: TextFormField(
                           controller: _categoryIdController,
                           decoration: const InputDecoration(
-                            labelText: 'Category ID *',
+                            labelText: 'ID Kategori *',
                             prefixIcon: Icon(Icons.category),
-                            border: OutlineInputBorder(),
                           ),
                           keyboardType: TextInputType.number,
                           validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Required';
-                            if (int.tryParse(v.trim()) == null) return 'Must be int';
+                            if (v == null || v.trim().isEmpty) return 'Wajib';
+                            if (int.tryParse(v.trim()) == null) return 'Angka';
                             return null;
                           },
                         ),
@@ -608,12 +635,11 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                         child: TextFormField(
                           controller: _rackLocationController,
                           decoration: const InputDecoration(
-                            labelText: 'Rack Location *',
+                            labelText: 'Lokasi Rak *',
                             prefixIcon: Icon(Icons.shelves),
-                            border: OutlineInputBorder(),
                           ),
                           validator: (v) =>
-                              v == null || v.trim().isEmpty ? 'Required' : null,
+                              v == null || v.trim().isEmpty ? 'Wajib' : null,
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -621,14 +647,13 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                         child: TextFormField(
                           controller: _stockController,
                           decoration: const InputDecoration(
-                            labelText: 'Stock *',
+                            labelText: 'Stok *',
                             prefixIcon: Icon(Icons.inventory_2),
-                            border: OutlineInputBorder(),
                           ),
                           keyboardType: TextInputType.number,
                           validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Required';
-                            if (int.tryParse(v.trim()) == null) return 'Must be int';
+                            if (v == null || v.trim().isEmpty) return 'Wajib';
+                            if (int.tryParse(v.trim()) == null) return 'Angka';
                             return null;
                           },
                         ),
@@ -641,12 +666,11 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                   TextFormField(
                     controller: _coverImageController,
                     decoration: InputDecoration(
-                      labelText: 'Cover Image URL',
+                      labelText: 'URL Sampul Buku (Cover Image)',
                       prefixIcon: const Icon(Icons.image),
-                      border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.refresh),
-                        tooltip: 'Preview image',
+                        tooltip: 'Preview gambar',
                         onPressed: () => setState(() {}),
                       ),
                     ),
@@ -657,9 +681,8 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                   TextFormField(
                     controller: _notesController,
                     decoration: const InputDecoration(
-                      labelText: 'Notes (Optional)',
+                      labelText: 'Catatan Khusus (Opsional)',
                       prefixIcon: Icon(Icons.notes),
-                      border: OutlineInputBorder(),
                     ),
                     maxLines: 2,
                   ),
@@ -669,18 +692,22 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                   // Live JSON Payload Preview Box
                   ExpansionTile(
                     title: const Text(
-                      'Preview JSON Payload',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                      'Preview Payload JSON',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                    leading: const Icon(Icons.code, size: 20),
+                    leading: const Icon(Icons.code, size: 20, color: AppColors.primary),
                     children: [
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
+                          color: AppColors.background,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(color: AppColors.border),
                         ),
                         child: Text(
                           const JsonEncoder.withIndent('  ')
@@ -688,6 +715,7 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                           style: const TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 11,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ),
@@ -711,12 +739,14 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                         : const Icon(Icons.send),
                     label: Text(
                       _isSending
-                          ? 'Sending to API...'
-                          : 'Confirm & Send to API',
-                      style: const TextStyle(fontSize: 16),
+                          ? 'Mengirim ke Server...'
+                          : 'Konfirmasi & Kirim ke Server',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                     ),
                     style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -725,9 +755,15 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: _isSending ? null : _saveDraftOnly,
-                    icon: const Icon(Icons.save_outlined),
-                    label: const Text('Save Locally (Don\'t Send Yet)'),
+                    icon: const Icon(Icons.save_outlined, color: AppColors.primaryDark),
+                    label: const Text(
+                      'Simpan Sebagai Draft Lokal',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.textPrimary,
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: AppColors.border),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),

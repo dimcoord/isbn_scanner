@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Configuration for the target API endpoint where scanned book data will be sent.
@@ -15,6 +17,9 @@ class ApiConfig {
 
   // Default endpoint and token as configured for the user's book scanning API
   static const String defaultEndpoint = 'http://127.0.0.1:8000/api/v1/books/isbn-scan';
+  static const String defaultLanHost = '192.168.1.112';
+  static const String defaultLanEndpoint = 'http://192.168.1.112:8000/api/v1/books/isbn-scan';
+  static const String defaultEmulatorEndpoint = 'http://10.0.2.2:8000/api/v1/books/isbn-scan';
   static const String defaultAuthToken = 'Bearer 2|xMfKgP7fOIHLvA7KpVjXl1Ijrg8bt3M1EaimTjtlccc0d98b';
 
   final String endpointUrl;
@@ -41,6 +46,46 @@ class ApiConfig {
 
   bool get isConfigured =>
       endpointUrl.trim().isNotEmpty && Uri.tryParse(endpointUrl)?.hasScheme == true;
+
+  /// Extracts the hostname or IP from the endpointUrl
+  String get host {
+    final uri = Uri.tryParse(endpointUrl);
+    return uri?.host ?? '';
+  }
+
+  /// Extracts the port from the endpointUrl
+  String get port {
+    final uri = Uri.tryParse(endpointUrl);
+    return (uri?.hasPort == true) ? uri!.port.toString() : '8000';
+  }
+
+  /// Extracts the path from the endpointUrl
+  String get path {
+    final uri = Uri.tryParse(endpointUrl);
+    return (uri != null && uri.path.isNotEmpty) ? uri.path : '/api/v1/books/isbn-scan';
+  }
+
+  /// Builds a dynamic endpoint URL using the specified host IP
+  static String buildEndpoint({
+    required String host,
+    String port = '8000',
+    String path = '/api/v1/books/isbn-scan',
+    String scheme = 'http',
+  }) {
+    final cleanHost = host.trim().replaceAll('http://', '').replaceAll('https://', '');
+    return '$scheme://$cleanHost:$port$path';
+  }
+
+  /// Suggests the appropriate default endpoint based on device environment
+  static String getSuggestedEndpoint() {
+    if (kIsWeb) return defaultEndpoint;
+    try {
+      if (Platform.isAndroid || Platform.isIOS) {
+        return defaultLanEndpoint;
+      }
+    } catch (_) {}
+    return defaultEndpoint;
+  }
 
   ApiConfig copyWith({
     String? endpointUrl,
@@ -86,10 +131,28 @@ class ApiConfig {
     return headers;
   }
 
-  /// Load configuration from SharedPreferences
+  /// Load configuration from SharedPreferences with smart dynamic IP resolution for mobile phones
   static Future<ApiConfig> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final url = prefs.getString(_keyEndpointUrl) ?? defaultEndpoint;
+    final savedUrl = prefs.getString(_keyEndpointUrl);
+    String url;
+
+    if (savedUrl != null && savedUrl.trim().isNotEmpty) {
+      url = savedUrl.trim();
+      // On real mobile devices, 127.0.0.1 cannot reach the developer PC.
+      // Automatically upgrade to defaultLanEndpoint so all mobile phones connect out-of-the-box!
+      if (!kIsWeb) {
+        try {
+          if ((Platform.isAndroid || Platform.isIOS) &&
+              (url == defaultEndpoint || url.contains('127.0.0.1') || url.contains('localhost'))) {
+            url = defaultLanEndpoint;
+          }
+        } catch (_) {}
+      }
+    } else {
+      url = getSuggestedEndpoint();
+    }
+
     final method = prefs.getString(_keyHttpMethod) ?? 'POST';
     final token = prefs.getString(_keyAuthToken) ?? defaultAuthToken;
     final rootKey = prefs.getString(_keyPayloadRootKey) ?? '';

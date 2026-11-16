@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/api_config.dart';
 import '../services/api_sender_service.dart';
+import '../theme/app_theme.dart';
 
 class ApiSettingsScreen extends StatefulWidget {
   const ApiSettingsScreen({super.key});
@@ -23,6 +24,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
   String _selectedMethod = 'POST';
   bool _isLoading = true;
   bool _isTesting = false;
+  bool _isDetecting = false;
 
   final ApiSenderService _apiSenderService = ApiSenderService();
 
@@ -111,10 +113,10 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
           children: [
             Icon(Icons.check_circle, color: Colors.white),
             SizedBox(width: 8),
-            Text('API Configuration saved successfully!'),
+            Text('Konfigurasi API berhasil disimpan!'),
           ],
         ),
-        backgroundColor: Colors.green,
+        backgroundColor: AppColors.primaryDark,
       ),
     );
   }
@@ -136,10 +138,10 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
           children: [
             Icon(
               result.isSuccess ? Icons.check_circle : Icons.error,
-              color: result.isSuccess ? Colors.green : Colors.red,
+              color: result.isSuccess ? AppColors.statusSent : AppColors.statusFailed,
             ),
             const SizedBox(width: 8),
-            Text(result.isSuccess ? 'Connection Success' : 'Connection Failed'),
+            Text(result.isSuccess ? 'Koneksi Berhasil' : 'Koneksi Gagal'),
           ],
         ),
         content: SingleChildScrollView(
@@ -149,14 +151,17 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
             children: [
               if (result.statusCode != null)
                 Text(
-                  'Status Code: ${result.statusCode}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  'Status HTTP: ${result.statusCode}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: result.isSuccess ? AppColors.statusSent : AppColors.statusFailed,
+                  ),
                 ),
               const SizedBox(height: 8),
               if (result.errorMessage != null)
                 Text(
-                  'Error: ${result.errorMessage}',
-                  style: const TextStyle(color: Colors.red),
+                  'Keterangan: ${result.errorMessage}',
+                  style: const TextStyle(color: AppColors.statusFailed),
                 ),
               if (_urlController.text.contains('127.0.0.1') ||
                   _urlController.text.contains('localhost')) ...[
@@ -164,34 +169,35 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
+                    color: AppColors.statusPendingBg,
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.amber.shade300),
+                    border: Border.all(color: AppColors.statusPendingBorder),
                   ),
                   child: const Text(
-                    '💡 Emulator Notice: If running in the Android Emulator, change "127.0.0.1" to "10.0.2.2" so the emulator can reach your PC server, or run "adb reverse tcp:8000 tcp:8000".',
-                    style: TextStyle(fontSize: 11, color: Colors.black87),
+                    '💡 Tips Emulator: Jika menggunakan Android Emulator, gunakan "10.0.2.2" sebagai pengganti "127.0.0.1" agar dapat mengakses server PC lokal, atau jalankan "adb reverse tcp:8000 tcp:8000".',
+                    style: TextStyle(fontSize: 11, color: AppColors.statusPending),
                   ),
                 ),
               ],
               if (result.responseBody != null && result.responseBody!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 const Text(
-                  'Server Response:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  'Respon Server:',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
                 Container(
                   margin: const EdgeInsets.only(top: 4),
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
+                    color: AppColors.background,
                     borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Text(
                     result.responseBody!.length > 400
                         ? '${result.responseBody!.substring(0, 400)}...'
                         : result.responseBody!,
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
                   ),
                 ),
               ],
@@ -208,6 +214,37 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
     );
   }
 
+  Future<void> _handleAutoDetect() async {
+    setState(() => _isDetecting = true);
+    final detectedUrl = await ApiSenderService.autoDetectServer(
+      extraHosts: [
+        _urlController.text,
+      ],
+    );
+
+    if (!mounted) return;
+    setState(() => _isDetecting = false);
+
+    if (detectedUrl != null) {
+      setState(() => _urlController.text = detectedUrl);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ Server ditemukan: $detectedUrl'),
+          backgroundColor: AppColors.statusSent,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Server belum ditemukan. Pastikan HP & Laptop di Wi-Fi yang sama dan jalankan: php artisan serve --host=0.0.0.0',
+          ),
+          backgroundColor: AppColors.statusPending,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -216,14 +253,12 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
       );
     }
 
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('API Endpoint Settings'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.save),
+            icon: const Icon(Icons.save_rounded, color: AppColors.primary),
             tooltip: 'Save Settings',
             onPressed: _saveConfig,
           ),
@@ -234,19 +269,22 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Card(
-              elevation: 0,
-              color: theme.colorScheme.primaryContainer.withAlpha(50),
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary.withAlpha(70)),
+              ),
               child: const Padding(
                 padding: EdgeInsets.all(14),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.blueAccent),
+                    Icon(Icons.info_outline, color: AppColors.primary),
                     SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Set your target API endpoint URL and token below. Scanned books will be sent as JSON to this endpoint.',
-                        style: TextStyle(fontSize: 13),
+                        'Atur URL endpoint API backend perpustakaan dan token autentikasi di bawah. Buku yang dipindai akan otomatis dikirim ke endpoint ini.',
+                        style: TextStyle(fontSize: 12.5, color: AppColors.primaryDarker, height: 1.3),
                       ),
                     ),
                   ],
@@ -260,7 +298,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
               controller: _urlController,
               decoration: InputDecoration(
                 labelText: 'Target API Endpoint URL *',
-                hintText: 'http://127.0.0.1:8000/api/v1/books/isbn-scan',
+                hintText: 'http://${ApiConfig.defaultLanHost}:8000/api/v1/books/isbn-scan',
                 prefixIcon: const Icon(Icons.link),
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
@@ -280,31 +318,91 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                 return null;
               },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
 
-            // Presets row
+            // Auto-Detect Button for all phones
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _isDetecting ? null : _handleAutoDetect,
+                icon: _isDetecting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.primary,
+                        ),
+                      )
+                    : const Icon(Icons.radar_rounded, size: 18),
+                label: Text(
+                  _isDetecting
+                      ? 'Mencari Server di Jaringan...'
+                      : '🔍 Deteksi Otomatis Server Web',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary, width: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Presets row (Wi-Fi HP, Emulator, Localhost)
             Wrap(
               spacing: 8,
-              runSpacing: 4,
+              runSpacing: 6,
               children: [
                 ActionChip(
-                  avatar: const Icon(Icons.computer, size: 14),
-                  label: const Text('127.0.0.1:8000', style: TextStyle(fontSize: 11)),
+                  avatar: const Icon(Icons.wifi, size: 14, color: AppColors.primary),
+                  label: const Text(
+                    '📶 Wi-Fi HP (${ApiConfig.defaultLanHost}:8000)',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primaryDark),
+                  ),
+                  backgroundColor: AppColors.primaryLight,
+                  side: const BorderSide(color: AppColors.primary),
                   onPressed: () {
                     setState(() {
-                      _urlController.text =
-                          'http://127.0.0.1:8000/api/v1/books/isbn-scan';
+                      _urlController.text = ApiConfig.defaultLanEndpoint;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Endpoint disetel ke IP Wi-Fi laptop (${ApiConfig.defaultLanHost}).'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.phone_android, size: 14, color: AppColors.primary),
+                  label: const Text(
+                    '10.0.2.2:8000 (Emulator)',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
+                  ),
+                  backgroundColor: AppColors.surface,
+                  side: const BorderSide(color: AppColors.border),
+                  onPressed: () {
+                    setState(() {
+                      _urlController.text = ApiConfig.defaultEmulatorEndpoint;
                     });
                   },
                 ),
                 ActionChip(
-                  avatar: const Icon(Icons.phone_android, size: 14),
-                  label: const Text('10.0.2.2:8000 (Emulator)',
-                      style: TextStyle(fontSize: 11)),
+                  avatar: const Icon(Icons.dns, size: 14, color: AppColors.textSecondary),
+                  label: const Text(
+                    '127.0.0.1:8000 (Localhost PC)',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                  ),
+                  backgroundColor: AppColors.surface,
+                  side: const BorderSide(color: AppColors.border),
                   onPressed: () {
                     setState(() {
-                      _urlController.text =
-                          'http://10.0.2.2:8000/api/v1/books/isbn-scan';
+                      _urlController.text = ApiConfig.defaultEndpoint;
                     });
                   },
                 ),
@@ -315,9 +413,8 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
             DropdownButtonFormField<String>(
               initialValue: _selectedMethod,
               decoration: const InputDecoration(
-                labelText: 'HTTP Method',
+                labelText: 'Metode HTTP',
                 prefixIcon: Icon(Icons.http),
-                border: OutlineInputBorder(),
               ),
               items: const [
                 DropdownMenuItem(value: 'POST', child: Text('POST')),
@@ -334,26 +431,29 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
             TextFormField(
               controller: _tokenController,
               decoration: const InputDecoration(
-                labelText: 'Authorization Token (Bearer)',
+                labelText: 'Token Otorisasi (Bearer)',
                 hintText: 'Bearer 2|xMfKgP7f...',
                 prefixIcon: Icon(Icons.key),
-                border: OutlineInputBorder(),
-                helperText: 'Auto-prepends "Bearer " if not present',
+                helperText: 'Otomatis menambahkan "Bearer " bila belum ada',
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
             // Default Inventory Values Section
-            Text(
-              'Default Inventory Values',
-              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+            const Text(
+              'Nilai Standar Inventaris',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 4),
             const Text(
-              'Prefilled values when scanning a new book (can be changed on review):',
-              style: TextStyle(fontSize: 12, color: Colors.black54),
+              'Nilai otomatis saat memindai buku baru (dapat disesuaikan saat review):',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
 
             Row(
               children: [
@@ -361,9 +461,8 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                   child: TextFormField(
                     controller: _categoryIdController,
                     decoration: const InputDecoration(
-                      labelText: 'Category ID',
+                      labelText: 'ID Kategori',
                       prefixIcon: Icon(Icons.category),
-                      border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.number,
                   ),
@@ -373,9 +472,8 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                   child: TextFormField(
                     controller: _rackLocationController,
                     decoration: const InputDecoration(
-                      labelText: 'Rack Location',
+                      labelText: 'Lokasi Rak',
                       prefixIcon: Icon(Icons.shelves),
-                      border: OutlineInputBorder(),
                     ),
                   ),
                 ),
@@ -384,9 +482,8 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                   child: TextFormField(
                     controller: _stockController,
                     decoration: const InputDecoration(
-                      labelText: 'Stock',
+                      labelText: 'Stok',
                       prefixIcon: Icon(Icons.inventory_2),
-                      border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.number,
                   ),
@@ -397,36 +494,42 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
 
             // Advanced Settings
             ExpansionTile(
-              title: const Text('Advanced Configurations', style: TextStyle(fontSize: 14)),
+              title: const Text(
+                'Konfigurasi Lanjutan',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              leading: const Icon(Icons.settings_suggest, color: AppColors.primary, size: 20),
               children: [
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _rootKeyController,
                   decoration: const InputDecoration(
-                    labelText: 'Payload Wrapper Key (Optional)',
-                    hintText: 'e.g. "book" for {"book": {...}}',
+                    labelText: 'Payload Wrapper Key (Opsional)',
+                    hintText: 'Contoh: "book" untuk {"book": {...}}',
                     prefixIcon: Icon(Icons.wrap_text),
-                    border: OutlineInputBorder(),
-                    helperText: 'Leave empty to send JSON directly at root',
+                    helperText: 'Kosongkan untuk mengirim JSON langsung di tingkat root',
                   ),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _headersController,
                   decoration: const InputDecoration(
-                    labelText: 'Custom Extra Headers in JSON (Optional)',
+                    labelText: 'Header Kustom Tambahan (JSON Opsional)',
                     hintText: '{"X-Custom-Header": "value"}',
                     prefixIcon: Icon(Icons.code),
-                    border: OutlineInputBorder(),
                   ),
                   maxLines: 2,
                   validator: (val) {
                     if (val == null || val.trim().isEmpty) return null;
                     try {
                       final decoded = json.decode(val);
-                      if (decoded is! Map) return 'Must be a valid JSON object';
+                      if (decoded is! Map) return 'Harus objek JSON valid';
                     } catch (e) {
-                      return 'Invalid JSON syntax';
+                      return 'Format sintaks JSON tidak valid';
                     }
                     return null;
                   },
@@ -435,11 +538,10 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                 TextFormField(
                   controller: _googleApiKeyController,
                   decoration: const InputDecoration(
-                    labelText: 'Google Books API Key (Optional)',
+                    labelText: 'Google Books API Key (Opsional)',
                     hintText: 'AIzaSy...',
                     prefixIcon: Icon(Icons.vpn_key),
-                    border: OutlineInputBorder(),
-                    helperText: 'Optional key for international lookups',
+                    helperText: 'Kunci opsional untuk pencarian buku internasional',
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -456,12 +558,18 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
                           )
-                        : const Icon(Icons.sensors),
-                    label: Text(_isTesting ? 'Testing...' : 'Test Connection'),
+                        : const Icon(Icons.sensors, color: AppColors.primary),
+                    label: Text(_isTesting ? 'Menguji...' : 'Uji Koneksi'),
                     style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primaryDark,
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: AppColors.border),
                       padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ),
@@ -470,9 +578,14 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                   child: FilledButton.icon(
                     onPressed: _saveConfig,
                     icon: const Icon(Icons.save),
-                    label: const Text('Save Settings'),
+                    label: const Text('Simpan Pengaturan'),
                     style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ),
@@ -480,18 +593,22 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
             ),
             const SizedBox(height: 24),
             const Divider(),
-            const SizedBox(height: 12),
-            Text(
-              'Payload Format Sent to Your Endpoint:',
-              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+            const SizedBox(height: 14),
+            const Text(
+              'Format Payload JSON yang Dikirim ke Endpoint:',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: AppColors.background,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(color: AppColors.border),
               ),
               child: const Text(
                 '{\n'
@@ -507,8 +624,8 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
                 '}',
                 style: TextStyle(
                   fontFamily: 'monospace',
-                  fontSize: 12,
-                  color: Colors.black87,
+                  fontSize: 11.5,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),

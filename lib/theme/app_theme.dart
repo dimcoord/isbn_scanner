@@ -1,38 +1,43 @@
 import 'package:flutter/material.dart';
 
 /// Design tokens and colors mirroring the Perpus Dupat web version.
-/// Palette: Teal (#279b92 & #1f8078), Slate / Light Grey (#f6f8fa & #e1e5e6),
+/// Palette: SMA Negeri 24 Navy Blue (#102a54, #163e75 & #1a4f8b),
+/// Slate Background (#f8fafc & #e2e8f0), Amber/Gold accents,
 /// and standard Emerald/Amber/Rose semantic statuses.
 class AppColors {
-  // Brand Primary & Accent Teals
-  static const Color primary = Color(0xFF279B92);
-  static const Color primaryDark = Color(0xFF1F8078);
-  static const Color primaryDarker = Color(0xFF1D7770);
-  static const Color primaryDrawer = Color(0xFF22877F);
-  static const Color primaryLight = Color(0xFFE6F5F4);
-  static const Color primaryTint = Color(0x1F279B92); // ~12% teal
+  // Brand Primary & Navy (Perpus Dupat SMA Negeri 24 Bandung Web: #102a54, #163e75, #1a4f8b)
+  static const Color primary = Color(0xFF1A4F8B);        // Royal Navy Blue
+  static const Color primaryDark = Color(0xFF153E75);    // Mid Navy (hover)
+  static const Color primaryDarker = Color(0xFF102A54);  // Deep Header Navy
+  static const Color primaryDrawer = Color(0xFF102A54);  // SMAN 24 Deep Navy
+  static const Color primaryLight = Color(0xFFEAF1F8);   // Soft Light Blue Tint
+  static const Color primaryTint = Color(0x1F1A4F8B);    // ~12% Navy
 
-  // Neutral Background & Surface
-  static const Color background = Color(0xFFF6F8FA);
+  // Accent Gold / Amber (Matching Perpus Dupat Web amber-400 indicator)
+  static const Color accent = Color(0xFFF59E0B);
+  static const Color accentLight = Color(0xFFFEF3C7);
+
+  // Neutral Background & Surface (Matching Web bg-slate-50)
+  static const Color background = Color(0xFFF8FAFC);
   static const Color canvas = background;
   static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceMuted = Color(0xFFF9FAFB);
+  static const Color surfaceMuted = Color(0xFFF1F5F9);
 
-  // Borders & Dividers
-  static const Color border = Color(0xFFE1E5E6);
-  static const Color borderSubtle = Color(0xFFF0F2F3);
+  // Borders & Dividers (Matching Web border-[#e2e8f0])
+  static const Color border = Color(0xFFE2E8F0);
+  static const Color borderSubtle = Color(0xFFF1F5F9);
 
-  // Typography
-  static const Color textPrimary = Color(0xFF111827);
-  static const Color textSecondary = Color(0xFF4B5563);
-  static const Color textMuted = Color(0xFF9CA3AF);
+  // Typography (Slate palette matching Web text-slate-900 / text-slate-600)
+  static const Color textPrimary = Color(0xFF0F172A);
+  static const Color textSecondary = Color(0xFF475569);
+  static const Color textMuted = Color(0xFF94A3B8);
   static const Color textOnPrimary = Color(0xFFFFFFFF);
-  static const Color textOnPrimarySubtle = Color(0xFFE1E5E6);
+  static const Color textOnPrimarySubtle = Color(0xFFE2E8F0);
 
-  // Scanner Viewfinder Colors
-  static const Color laser = Color(0xFF279B92);
-  static const Color laserGlow = Color(0xFF2DD4BF);
-  static const Color viewfinderBorder = Color(0xFF279B92);
+  // Scanner Viewfinder Colors (Vibrant Sapphire & Sky Blue Laser)
+  static const Color laser = Color(0xFF2563EB);
+  static const Color laserGlow = Color(0xFF38BDF8);
+  static const Color viewfinderBorder = Color(0xFF1A4F8B);
 
   // Status: Sent / Success (Emerald)
   static const Color statusSent = Color(0xFF059669);

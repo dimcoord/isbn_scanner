@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'api_settings_screen.dart';
 import 'history_screen.dart';
 import 'scanner_screen.dart';
 import '../services/history_service.dart';
@@ -25,7 +24,6 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           ScannerScreen(isActive: _currentIndex == 0),
           const HistoryScreen(),
-          const ApiSettingsScreen(),
         ],
       ),
       bottomNavigationBar: Container(
@@ -48,30 +46,37 @@ class _HomeScreenState extends State<HomeScreen> {
         child: SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // 1. History Tab (Left - Folder/Document in Mockup)
-                _buildNavItem(
-                  index: 1,
-                  icon: Icons.folder_outlined,
-                  activeIcon: Icons.folder,
-                  label: 'History',
-                  showBadge: true,
+                // 1. Scan Tab (Left Action)
+                Expanded(
+                  child: _buildNavItem(
+                    index: 0,
+                    icon: Icons.qr_code_scanner_outlined,
+                    activeIcon: Icons.qr_code_scanner,
+                    label: 'Pindai ISBN',
+                    showBadge: false,
+                  ),
                 ),
 
-                // 2. Scan Tab (Center - Elevated Circular Action Button in Mockup)
-                _buildCenterScanItem(),
+                Container(
+                  height: 32,
+                  width: 1,
+                  color: AppColors.border,
+                ),
 
-                // 3. API Config Tab (Right - Settings in Mockup)
-                _buildNavItem(
-                  index: 2,
-                  icon: Icons.tune_outlined,
-                  activeIcon: Icons.tune,
-                  label: 'API Config',
-                  showBadge: false,
+                // 2. History Tab (Right Action)
+                Expanded(
+                  child: _buildNavItem(
+                    index: 1,
+                    icon: Icons.auto_stories_outlined,
+                    activeIcon: Icons.auto_stories,
+                    label: 'Riwayat Buku',
+                    showBadge: true,
+                  ),
                 ),
               ],
             ),
@@ -155,62 +160,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildCenterScanItem() {
-    final isSelected = _currentIndex == 0;
-
-    return InkWell(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        setState(() => _currentIndex = 0);
-      },
-      borderRadius: BorderRadius.circular(30),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isSelected
-                    ? [AppColors.primary, AppColors.laserGlow]
-                    : [AppColors.primary.withAlpha(200), AppColors.primary],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withAlpha(isSelected ? 110 : 60),
-                  blurRadius: isSelected ? 12 : 6,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-              border: Border.all(
-                color: Colors.white,
-                width: 2.5,
-              ),
-            ),
-            child: const Icon(
-              Icons.qr_code_scanner,
-              color: Colors.white,
-              size: 26,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            'Scan',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -17,10 +17,10 @@ class ApiConfig {
 
   // Default endpoint and token as configured for the user's book scanning API
   static const String defaultEndpoint = 'http://127.0.0.1:8000/api/v1/books/isbn-scan';
-  static const String defaultLanHost = '192.168.1.112';
-  static const String defaultLanEndpoint = 'http://192.168.1.112:8000/api/v1/books/isbn-scan';
+  static const String defaultLanHost = '192.168.1.16';
+  static const String defaultLanEndpoint = 'http://192.168.1.16:8000/api/v1/books/isbn-scan';
   static const String defaultEmulatorEndpoint = 'http://10.0.2.2:8000/api/v1/books/isbn-scan';
-  static const String defaultAuthToken = 'Bearer 2|xMfKgP7fOIHLvA7KpVjXl1Ijrg8bt3M1EaimTjtlccc0d98b';
+  static const String defaultAuthToken = 'Bearer 6|poOhhfvNdjeMMr1F6xLPZUnN6LQnEODMGgtUMFk6f877a729';
 
   final String endpointUrl;
   final String httpMethod; // 'POST', 'PUT', 'PATCH'

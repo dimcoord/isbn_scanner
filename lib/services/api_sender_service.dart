@@ -160,6 +160,7 @@ class ApiSenderService {
       rackLocation: config.defaultRackLocation,
       stock: config.defaultStock,
       coverImage: 'https://example.com/covers/bumi-manusia.jpg',
+      sinopsis: 'Bumi Manusia adalah buku pertama dari Tetralogi Buru karya Pramoedya Ananta Toer.',
       scannedAt: DateTime.now(),
       notes: 'API Test Connection',
     );

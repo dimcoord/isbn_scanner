@@ -18,6 +18,7 @@ class Book {
   final int stock;
   final String? coverImage;
   final String description;
+  final String sinopsis;
   final int? pageCount;
   final List<String> categories;
   final String language;
@@ -43,6 +44,7 @@ class Book {
     this.stock = 5,
     this.coverImage,
     this.description = '',
+    this.sinopsis = '',
     this.pageCount,
     this.categories = const [],
     this.language = '',
@@ -87,6 +89,17 @@ class Book {
     return '';
   }
 
+  /// Resolved synopsis / description text
+  String get resolvedSinopsis {
+    if (sinopsis.trim().isNotEmpty) {
+      return sinopsis.trim();
+    }
+    if (description.trim().isNotEmpty) {
+      return description.trim();
+    }
+    return '';
+  }
+
   /// Converts book into the exact JSON format required by the API endpoint:
   /// {
   ///   "isbn": "9786020332956",
@@ -96,6 +109,7 @@ class Book {
   ///   "publication_year": 2005,
   ///   "category_id": 8,
   ///   "rack_location": "Rak-A1",
+  ///   "sinopsis": "...",
   ///   "stock": 5,
   ///   "cover_image": "https://example.com/covers/bumi-manusia.jpg"
   /// }
@@ -108,6 +122,7 @@ class Book {
       'publication_year': resolvedPublicationYear,
       'category_id': categoryId,
       'rack_location': rackLocation,
+      'sinopsis': resolvedSinopsis,
       'stock': stock,
       'cover_image': resolvedCoverImage,
     };
@@ -130,6 +145,7 @@ class Book {
     int? stock,
     String? coverImage,
     String? description,
+    String? sinopsis,
     int? pageCount,
     List<String>? categories,
     String? language,
@@ -155,6 +171,7 @@ class Book {
       stock: stock ?? this.stock,
       coverImage: coverImage ?? this.coverImage,
       description: description ?? this.description,
+      sinopsis: sinopsis ?? this.sinopsis,
       pageCount: pageCount ?? this.pageCount,
       categories: categories ?? this.categories,
       language: language ?? this.language,
@@ -183,6 +200,7 @@ class Book {
       'stock': stock,
       'coverImage': coverImage,
       'description': description,
+      'sinopsis': resolvedSinopsis,
       'pageCount': pageCount,
       'categories': categories,
       'language': language,
@@ -239,7 +257,12 @@ class Book {
       coverImage: map['coverImage'] as String? ??
           map['cover_image'] as String? ??
           map['thumbnailUrl'] as String?,
-      description: map['description'] as String? ?? '',
+      description: map['description'] as String? ??
+          map['sinopsis'] as String? ??
+          '',
+      sinopsis: map['sinopsis'] as String? ??
+          map['description'] as String? ??
+          '',
       pageCount: map['pageCount'] is int
           ? map['pageCount'] as int
           : int.tryParse(map['pageCount']?.toString() ?? ''),

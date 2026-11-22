@@ -115,7 +115,7 @@ class _SplashScreenState extends State<SplashScreen>
 
               const Spacer(),
 
-              // Center Illustration Art (Matching Mockup with Modern Library Motifs)
+              // Center Logo SMAN 24 Bandung & Scanner Emblem
               Center(
                 child: SizedBox(
                   width: 260,
@@ -133,37 +133,37 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                       ),
 
-                      // Decorative floating circle dots
+                      // Decorative floating circle dots (SMA 24 Yellow & Laser Glow)
                       Positioned(
-                        top: 24,
-                        left: 28,
+                        top: 20,
+                        left: 24,
                         child: Container(
                           width: 14,
                           height: 14,
                           decoration: const BoxDecoration(
-                            color: Color(0xFFFBBF24), // Amber accent
+                            color: Color(0xFFFBBF24), // Amber Gold
                             shape: BoxShape.circle,
                           ),
                         ),
                       ),
                       Positioned(
-                        top: 50,
+                        top: 40,
                         right: 20,
                         child: Container(
-                          width: 18,
-                          height: 18,
+                          width: 16,
+                          height: 16,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
                               color: AppColors.primary,
-                              width: 3,
+                              width: 2.5,
                             ),
                           ),
                         ),
                       ),
                       Positioned(
-                        bottom: 30,
-                        left: 36,
+                        bottom: 24,
+                        left: 32,
                         child: Container(
                           width: 10,
                           height: 10,
@@ -174,136 +174,77 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                       ),
 
-                      // Document / Book Card 1 (Back angled)
-                      Transform.rotate(
-                        angle: -0.12,
-                        child: Container(
-                          width: 130,
-                          height: 170,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF3F4F6),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: AppColors.border,
-                              width: 1.5,
+                      // Main Card Emblem with SMAN 24 Logo
+                      Container(
+                        width: 180,
+                        height: 180,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFFFBBF24).withAlpha(180),
+                            width: 3.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withAlpha(45),
+                              blurRadius: 24,
+                              offset: const Offset(0, 10),
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withAlpha(12),
-                                blurRadius: 16,
-                                offset: const Offset(0, 8),
+                          ],
+                        ),
+                        child: Center(
+                          child: ClipOval(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Image.asset(
+                                'assets/images/logo_sman24.png',
+                                width: 135,
+                                height: 135,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Icon(
+                                    Icons.school_rounded,
+                                    size: 72,
+                                    color: AppColors.primary,
+                                  );
+                                },
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
 
-                      // Document / Book Card 2 (Front main)
-                      Transform.rotate(
-                        angle: 0.05,
-                        child: Container(
-                          width: 145,
-                          height: 180,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: AppColors.border,
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primary.withAlpha(25),
-                                blurRadius: 20,
-                                offset: const Offset(0, 10),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Top document lines
-                              Container(
-                                width: 50,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryLight,
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Container(
-                                width: 100,
-                                height: 5,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE5E7EB),
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Container(
-                                width: 80,
-                                height: 5,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE5E7EB),
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                              const Spacer(),
-                              // Barcode stripes simulation
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryLight,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: AppColors.primary.withAlpha(50),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceEvenly,
-                                  children: List.generate(
-                                    11,
-                                    (i) => Container(
-                                      width: (i % 3 == 0) ? 3 : 1.5,
-                                      height: 24,
-                                      color: AppColors.primaryDark,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // Magnifying Glass / Scanner Lens Icon
+                      // Scanner Lens Floating Badge (Bottom Right)
                       Positioned(
-                        right: 28,
-                        bottom: 24,
+                        right: 32,
+                        bottom: 18,
                         child: Container(
-                          width: 68,
-                          height: 68,
+                          width: 54,
+                          height: 54,
                           decoration: BoxDecoration(
-                            color: AppColors.primary,
+                            gradient: const LinearGradient(
+                              colors: [AppColors.primaryDarker, AppColors.primary],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
                             shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white,
+                              width: 3,
+                            ),
                             boxShadow: [
                               BoxShadow(
                                 color: AppColors.primary.withAlpha(90),
-                                blurRadius: 16,
-                                offset: const Offset(0, 6),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
                               ),
                             ],
                           ),
                           child: const Icon(
                             Icons.qr_code_scanner,
-                            color: Colors.white,
-                            size: 34,
+                            color: Color(0xFFFBBF24),
+                            size: 26,
                           ),
                         ),
                       ),
@@ -314,9 +255,9 @@ class _SplashScreenState extends State<SplashScreen>
 
               const Spacer(),
 
-              // Headline & Description (Like mockup left screen)
+              // Headline & Description
               const Text(
-                'Selamat Datang di\nPerpus Dupat Scanner',
+                'Perpustakaan SMAN 24\nISBN Scanner',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 24,
@@ -330,7 +271,7 @@ class _SplashScreenState extends State<SplashScreen>
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.0),
                 child: Text(
-                  'Pindai barcode & ISBN buku secara instan, lengkapi metadata otomatis, dan sinkronkan langsung ke katalog web.',
+                  'Pindai barcode & ISBN buku secara instan, lengkapi metadata otomatis, dan sinkronkan langsung ke katalog web Perpus Dupat.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,

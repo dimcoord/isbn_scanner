@@ -29,10 +29,12 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
   late TextEditingController _authorController;
   late TextEditingController _publisherController;
   late TextEditingController _yearController;
+  late TextEditingController _pageCountController;
   late TextEditingController _categoryIdController;
   late TextEditingController _rackLocationController;
   late TextEditingController _stockController;
   late TextEditingController _coverImageController;
+  late TextEditingController _sinopsisController;
   late TextEditingController _notesController;
 
   late ApiConfig _apiConfig;
@@ -52,10 +54,14 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
     _authorController = TextEditingController(text: book.author.isNotEmpty ? book.author : book.authorsFormatted);
     _publisherController = TextEditingController(text: book.publisher);
     _yearController = TextEditingController(text: book.resolvedPublicationYear.toString());
+    _pageCountController = TextEditingController(
+      text: book.pageCount != null && book.pageCount! > 0 ? book.pageCount.toString() : '',
+    );
     _categoryIdController = TextEditingController(text: book.categoryId.toString());
     _rackLocationController = TextEditingController(text: book.rackLocation);
     _stockController = TextEditingController(text: book.stock.toString());
     _coverImageController = TextEditingController(text: book.resolvedCoverImage);
+    _sinopsisController = TextEditingController(text: book.resolvedSinopsis);
     _notesController = TextEditingController(text: book.notes);
 
     _loadApiConfig();
@@ -88,10 +94,12 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
     _authorController.dispose();
     _publisherController.dispose();
     _yearController.dispose();
+    _pageCountController.dispose();
     _categoryIdController.dispose();
     _rackLocationController.dispose();
     _stockController.dispose();
     _coverImageController.dispose();
+    _sinopsisController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -105,6 +113,8 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
     final stock = int.tryParse(_stockController.text.trim()) ??
         widget.initialBook.stock;
     final cover = _coverImageController.text.trim();
+    final sinopsisText = _sinopsisController.text.trim();
+    final pageCount = int.tryParse(_pageCountController.text.trim());
 
     return widget.initialBook.copyWith(
       isbn: _isbnController.text.trim(),
@@ -119,6 +129,9 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
       stock: stock,
       coverImage: cover,
       thumbnailUrl: cover,
+      description: sinopsisText,
+      sinopsis: sinopsisText,
+      pageCount: pageCount,
       notes: _notesController.text.trim(),
       syncStatus: syncStatus,
     );
@@ -431,6 +444,30 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                                         ),
                                       ),
                                     ),
+                                    if (book.pageCount != null && book.pageCount! > 0)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primaryLight,
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: AppColors.primary.withAlpha(60)),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.auto_stories, size: 11, color: AppColors.primaryDark),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '${book.pageCount} hlm',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.primaryDark,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                       decoration: BoxDecoration(
@@ -568,22 +605,20 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Publisher & Year
+                  // Publisher
+                  TextFormField(
+                    controller: _publisherController,
+                    decoration: const InputDecoration(
+                      labelText: 'Penerbit',
+                      prefixIcon: Icon(Icons.business),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Year & Page Count
                   Row(
                     children: [
                       Expanded(
-                        flex: 3,
-                        child: TextFormField(
-                          controller: _publisherController,
-                          decoration: const InputDecoration(
-                            labelText: 'Penerbit',
-                            prefixIcon: Icon(Icons.business),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        flex: 2,
                         child: TextFormField(
                           controller: _yearController,
                           decoration: const InputDecoration(
@@ -598,7 +633,34 @@ class _BookReviewScreenState extends State<BookReviewScreen> {
                           },
                         ),
                       ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _pageCountController,
+                          decoration: const InputDecoration(
+                            labelText: 'Jumlah Halaman',
+                            hintText: 'Contoh: 320',
+                            prefixIcon: Icon(Icons.auto_stories_outlined),
+                            suffixText: 'hlm',
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Sinopsis Buku
+                  TextFormField(
+                    controller: _sinopsisController,
+                    decoration: const InputDecoration(
+                      labelText: 'Sinopsis Buku',
+                      hintText: 'Ringkasan cerita atau sinopsis buku...',
+                      prefixIcon: Icon(Icons.description_outlined),
+                      alignLabelWithHint: true,
+                    ),
+                    minLines: 3,
+                    maxLines: 6,
                   ),
                   const SizedBox(height: 20),
 

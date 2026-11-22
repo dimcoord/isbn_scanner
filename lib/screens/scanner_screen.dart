@@ -9,6 +9,20 @@ import 'api_settings_screen.dart';
 import 'book_review_screen.dart';
 import 'splash_screen.dart';
 
+enum _PreviewActionType { review, manual }
+
+class _PreviewResult {
+  final _PreviewActionType action;
+  final Book? book;
+  final String? source;
+
+  const _PreviewResult({
+    required this.action,
+    this.book,
+    this.source,
+  });
+}
+
 class ScannerScreen extends StatefulWidget {
   final bool isActive;
 
@@ -27,9 +41,19 @@ class _ScannerScreenState extends State<ScannerScreen>
   final BookFetchService _fetchService = BookFetchService();
 
   bool _isProcessing = false;
+  bool _isCameraEnabled = true; // Status kamera: bisa ditutup/dinonaktifkan
   bool _isTorchOn = false;
   double _currentZoom = 1.0;
   ApiConfig? _apiConfig;
+
+  // Anti-accidental scan & cooldown
+  String? _lastScannedBarcode;
+  DateTime? _lastScannedTime;
+  bool _isCooldown = false;
+
+  // Secret Developer Door (5x tap on title)
+  int _secretDevTapCount = 0;
+  DateTime? _lastDevTapTime;
 
   late AnimationController _animController;
 
@@ -60,7 +84,7 @@ class _ScannerScreenState extends State<ScannerScreen>
   void didUpdateWidget(ScannerScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActive != widget.isActive) {
-      if (widget.isActive) {
+      if (widget.isActive && _isCameraEnabled) {
         _animController.repeat(reverse: true);
         _scannerController.start();
       } else {
@@ -73,7 +97,7 @@ class _ScannerScreenState extends State<ScannerScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if (!widget.isActive) return;
+    if (!widget.isActive || !_isCameraEnabled) return;
 
     if (state == AppLifecycleState.resumed) {
       _scannerController.start();
@@ -100,14 +124,56 @@ class _ScannerScreenState extends State<ScannerScreen>
     super.dispose();
   }
 
+  Future<void> _toggleCamera() async {
+    if (_isCameraEnabled) {
+      // Tutup / Matikan Kamera
+      await _scannerController.stop();
+      _animController.stop();
+      if (_isTorchOn) {
+        try {
+          await _scannerController.toggleTorch();
+        } catch (_) {}
+        _isTorchOn = false;
+      }
+      setState(() => _isCameraEnabled = false);
+      HapticFeedback.mediumImpact();
+    } else {
+      // Buka / Aktifkan Kamera
+      if (widget.isActive) {
+        await _scannerController.start();
+        _animController.repeat(reverse: true);
+      }
+      setState(() {
+        _isCameraEnabled = true;
+        _isCooldown = true;
+      });
+      HapticFeedback.lightImpact();
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (mounted) setState(() => _isCooldown = false);
+      });
+    }
+  }
+
   void _onDetect(BarcodeCapture capture) {
-    if (!widget.isActive || _isProcessing) return;
+    if (!widget.isActive || !_isCameraEnabled || _isProcessing || _isCooldown) {
+      return;
+    }
 
     for (final barcode in capture.barcodes) {
       final value = barcode.rawValue;
       if (value != null && value.trim().isNotEmpty) {
-        _handleBarcodeScanned(value.trim());
-        break;
+        final clean = BookFetchService.cleanIsbn(value.trim());
+        if (clean.length >= 8) {
+          // Cegah scan ulang tak sengaja untuk barcode yang sama dalam 4 detik
+          if (_lastScannedBarcode == clean && _lastScannedTime != null) {
+            final diff = DateTime.now().difference(_lastScannedTime!);
+            if (diff.inSeconds < 4) {
+              return;
+            }
+          }
+          _handleBarcodeScanned(clean);
+          break;
+        }
       }
     }
   }
@@ -122,22 +188,22 @@ class _ScannerScreenState extends State<ScannerScreen>
     }
   }
 
-  Future<void> _handleBarcodeScanned(String rawBarcode) async {
-    final clean = BookFetchService.cleanIsbn(rawBarcode);
-    if (clean.length < 8) {
-      return;
-    }
-
-    setState(() => _isProcessing = true);
+  Future<void> _handleBarcodeScanned(String clean) async {
+    setState(() {
+      _isProcessing = true;
+      _lastScannedBarcode = clean;
+      _lastScannedTime = DateTime.now();
+    });
     HapticFeedback.mediumImpact();
 
-    // Pause camera stream while previewing
+    // Pause camera stream & animasi while previewing
     await _scannerController.stop();
+    _animController.stop();
 
     if (!mounted) return;
 
-    // Show Sleek Bottom Sheet Preview
-    await showModalBottomSheet<void>(
+    // Show Sleek Bottom Sheet Preview dan AWAIT resultnya
+    final result = await showModalBottomSheet<_PreviewResult?>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -146,55 +212,88 @@ class _ScannerScreenState extends State<ScannerScreen>
           isbn: clean,
           fetchService: _fetchService,
           apiConfig: _apiConfig,
-          onReviewBook: (book, source) async {
-            Navigator.of(bottomSheetContext).pop();
-            await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => BookReviewScreen(
-                  initialBook: book,
-                  fetchSource: source,
-                ),
+          onReviewBook: (book, source) {
+            Navigator.of(bottomSheetContext).pop(
+              _PreviewResult(
+                action: _PreviewActionType.review,
+                book: book,
+                source: source,
               ),
             );
           },
-          onManualEntry: () async {
-            Navigator.of(bottomSheetContext).pop();
-            final manualBook = Book(
-              id: 'manual_${DateTime.now().millisecondsSinceEpoch}',
-              isbn: clean,
-              isbn13: clean.length == 13 ? clean : null,
-              isbn10: clean.length == 10 ? clean : null,
-              title: '',
-              scannedAt: DateTime.now(),
-              syncStatus: 'pending',
-            );
-            await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => BookReviewScreen(
-                  initialBook: manualBook,
-                  fetchSource: 'Manual',
-                ),
+          onManualEntry: () {
+            Navigator.of(bottomSheetContext).pop(
+              const _PreviewResult(
+                action: _PreviewActionType.manual,
               ),
             );
           },
           onClose: () {
-            Navigator.of(bottomSheetContext).pop();
+            Navigator.of(bottomSheetContext).pop(null);
           },
         );
       },
     );
 
-    // Resume camera when bottom sheet is dismissed
+    // Jika user memilih Review atau Manual Entry:
+    // SELAMA BookReviewScreen TERBUKA, KAMERA TETAP DALAM KEADAAN MATI (STOPPED)
+    if (result != null && mounted) {
+      if (result.action == _PreviewActionType.review && result.book != null) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BookReviewScreen(
+              initialBook: result.book!,
+              fetchSource: result.source ?? 'Google Books',
+            ),
+          ),
+        );
+      } else if (result.action == _PreviewActionType.manual) {
+        final manualBook = Book(
+          id: 'manual_${DateTime.now().millisecondsSinceEpoch}',
+          isbn: clean,
+          isbn13: clean.length == 13 ? clean : null,
+          isbn10: clean.length == 10 ? clean : null,
+          title: '',
+          scannedAt: DateTime.now(),
+          syncStatus: 'pending',
+        );
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BookReviewScreen(
+              initialBook: manualBook,
+              fetchSource: 'Manual',
+            ),
+          ),
+        );
+      }
+    }
+
+    // Berikan cooldown setelah modal/layar tertutup agar tidak langsung scan lagi tak sengaja
     if (mounted) {
-      if (widget.isActive) {
+      _isCooldown = true;
+      if (widget.isActive && _isCameraEnabled) {
         await _scannerController.start();
+        _animController.repeat(reverse: true);
       }
       setState(() => _isProcessing = false);
       _loadConfig();
+
+      Future.delayed(const Duration(milliseconds: 2500), () {
+        if (mounted) {
+          setState(() => _isCooldown = false);
+        }
+      });
     }
   }
 
   Future<void> _showManualIsbnDialog() async {
+    // Pause kamera saat dialog manual terbuka agar tidak scan di background
+    if (_isCameraEnabled && widget.isActive) {
+      await _scannerController.stop();
+      _animController.stop();
+    }
+    if (!mounted) return;
+
     final controller = TextEditingController();
     final isbn = await showDialog<String>(
       context: context,
@@ -248,11 +347,22 @@ class _ScannerScreenState extends State<ScannerScreen>
 
     if (isbn != null && isbn.isNotEmpty) {
       _handleBarcodeScanned(isbn);
+    } else {
+      if (mounted && _isCameraEnabled && widget.isActive && !_isProcessing) {
+        await _scannerController.start();
+        _animController.repeat(reverse: true);
+      }
     }
   }
 
-  void _showAppInfoDialog() {
-    showDialog(
+  Future<void> _showAppInfoDialog() async {
+    if (_isCameraEnabled && widget.isActive) {
+      await _scannerController.stop();
+      _animController.stop();
+    }
+    if (!mounted) return;
+
+    await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(
@@ -273,7 +383,7 @@ class _ScannerScreenState extends State<ScannerScreen>
               'Aplikasi pemindai barcode ISBN buku terintegrasi dengan Google Books, Perpustakaan Nasional RI, dan sistem Web Perpus Dupat.',
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () {
                 Navigator.of(ctx).pop();
@@ -286,6 +396,15 @@ class _ScannerScreenState extends State<ScannerScreen>
               icon: const Icon(Icons.slideshow_rounded, size: 18),
               label: const Text('Lihat Layar Sambutan / Panduan'),
             ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _openApiSettings();
+              },
+              icon: const Icon(Icons.tune_rounded, size: 18),
+              label: const Text('Konfigurasi API / IP (Developer)'),
+            ),
           ],
         ),
         actions: [
@@ -296,6 +415,59 @@ class _ScannerScreenState extends State<ScannerScreen>
         ],
       ),
     );
+
+    if (mounted && _isCameraEnabled && widget.isActive && !_isProcessing) {
+      await _scannerController.start();
+      _animController.repeat(reverse: true);
+    }
+  }
+
+  void _handleSecretDevTap() {
+    final now = DateTime.now();
+    if (_lastDevTapTime == null ||
+        now.difference(_lastDevTapTime!).inMilliseconds > 2500) {
+      _secretDevTapCount = 1;
+    } else {
+      _secretDevTapCount++;
+    }
+    _lastDevTapTime = now;
+
+    if (_secretDevTapCount >= 5) {
+      _secretDevTapCount = 0;
+      HapticFeedback.heavyImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('🔓 Mode Developer: Membuka Pengaturan API...'),
+          duration: Duration(milliseconds: 1500),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+      _openApiSettings();
+    } else if (_secretDevTapCount >= 3) {
+      HapticFeedback.selectionClick();
+    }
+  }
+
+  Future<void> _openApiSettings() async {
+    if (_isCameraEnabled && widget.isActive) {
+      await _scannerController.stop();
+      _animController.stop();
+    }
+    if (!mounted) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const ApiSettingsScreen(),
+      ),
+    );
+
+    if (mounted) {
+      _loadConfig();
+      if (_isCameraEnabled && widget.isActive && !_isProcessing) {
+        await _scannerController.start();
+        _animController.repeat(reverse: true);
+      }
+    }
   }
 
   @override
@@ -351,6 +523,63 @@ class _ScannerScreenState extends State<ScannerScreen>
               },
             ),
           ),
+
+          // 1b. Camera Closed / Disabled Overlay
+          if (!_isCameraEnabled)
+            Positioned.fill(
+              child: Container(
+                color: const Color(0xFF0F172A),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(15),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white.withAlpha(30)),
+                          ),
+                          child: const Icon(
+                            Icons.videocam_off_rounded,
+                            size: 46,
+                            color: Colors.white70,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Kamera Ditutup',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Pemindai dinonaktifkan agar tidak sengaja memindai buku.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white60, fontSize: 12.5),
+                        ),
+                        const SizedBox(height: 20),
+                        FilledButton.icon(
+                          onPressed: _toggleCamera,
+                          icon: const Icon(Icons.videocam_rounded, size: 18),
+                          label: const Text('Buka / Aktifkan Kamera'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // 2. Soft Gradient at Top for Header Legibility (Does NOT black out the camera)
           Positioned(
@@ -431,38 +660,39 @@ class _ScannerScreenState extends State<ScannerScreen>
                         ),
                       ),
 
-                      // Animated Glowing Teal Horizontal Laser Bar
-                      AnimatedBuilder(
-                        animation: _animController,
-                        builder: (context, child) {
-                          final topOffset =
-                              (scanAreaHeight - 4) * _animController.value;
-                          return Positioned(
-                            top: topOffset,
-                            left: 10,
-                            right: 10,
-                            child: Container(
-                              height: 3.5,
-                              decoration: BoxDecoration(
-                                color: AppColors.laserGlow,
-                                borderRadius: BorderRadius.circular(2),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.laser.withAlpha(240),
-                                    blurRadius: 10,
-                                    spreadRadius: 2,
-                                  ),
-                                  BoxShadow(
-                                    color: AppColors.laserGlow,
-                                    blurRadius: 4,
-                                    spreadRadius: 1,
-                                  ),
-                                ],
+                      // Animated Glowing Teal Horizontal Laser Bar (Only active when camera is enabled)
+                      if (_isCameraEnabled)
+                        AnimatedBuilder(
+                          animation: _animController,
+                          builder: (context, child) {
+                            final topOffset =
+                                (scanAreaHeight - 4) * _animController.value;
+                            return Positioned(
+                              top: topOffset,
+                              left: 10,
+                              right: 10,
+                              child: Container(
+                                height: 3.5,
+                                decoration: BoxDecoration(
+                                  color: AppColors.laserGlow,
+                                  borderRadius: BorderRadius.circular(2),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.laser.withAlpha(240),
+                                      blurRadius: 10,
+                                      spreadRadius: 2,
+                                    ),
+                                    BoxShadow(
+                                      color: AppColors.laserGlow,
+                                      blurRadius: 4,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
+                            );
+                          },
+                        ),
                     ],
                   ),
                 ),
@@ -475,15 +705,27 @@ class _ScannerScreenState extends State<ScannerScreen>
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.white.withAlpha(40)),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.qr_code_scanner, color: AppColors.laserGlow, size: 14),
-                      SizedBox(width: 6),
+                      Icon(
+                        !_isCameraEnabled
+                            ? Icons.videocam_off_rounded
+                            : (_isCooldown ? Icons.hourglass_top_rounded : Icons.qr_code_scanner),
+                        color: !_isCameraEnabled
+                            ? Colors.white54
+                            : (_isCooldown ? const Color(0xFFFBBF24) : AppColors.laserGlow),
+                        size: 14,
+                      ),
+                      const SizedBox(width: 6),
                       Text(
-                        'Arahkan barcode ISBN buku ke dalam kotak',
+                        !_isCameraEnabled
+                            ? 'Kamera tertutup (scanner nonaktif)'
+                            : (_isCooldown
+                                ? 'Jeda pemindai... Siap memindai'
+                                : 'Arahkan barcode ISBN buku ke dalam kotak'),
                         style: TextStyle(
-                          color: Colors.white,
+                          color: !_isCameraEnabled ? Colors.white70 : Colors.white,
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
                         ),
@@ -516,40 +758,44 @@ class _ScannerScreenState extends State<ScannerScreen>
                           tooltip: 'Tentang Aplikasi',
                           onTap: _showAppInfoDialog,
                         ),
-                        // Center Title Tag
+                        // Center Title Tag (Secret tap 5x for Developer Mode / API Settings)
                         Expanded(
                           child: Center(
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 8),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withAlpha(150),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: Colors.white.withAlpha(40),
+                            child: GestureDetector(
+                              onTap: _handleSecretDevTap,
+                              behavior: HitTestBehavior.opaque,
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
                                 ),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.qr_code_scanner, color: AppColors.laserGlow, size: 15),
-                                  SizedBox(width: 6),
-                                  Flexible(
-                                    child: Text(
-                                      'Perpus Dupat Scanner',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w700,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withAlpha(150),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Colors.white.withAlpha(40),
+                                  ),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.qr_code_scanner, color: AppColors.laserGlow, size: 15),
+                                    SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        'Perpus Dupat Scanner',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -568,13 +814,14 @@ class _ScannerScreenState extends State<ScannerScreen>
                     // Top 3 Quick Mode Cards (Matching Mockup: Doc Mode, QR Mode, ID Scanner)
                     Row(
                       children: [
-                        // Card 1: Auto Scan ISBN (Active)
+                        // Card 1: Toggle Kamera Aktif / Tutup
                         Expanded(
                           child: _buildTopModeCard(
-                            icon: Icons.qr_code_scanner,
-                            title: 'Scan ISBN',
-                            isActive: true,
-                            onTap: () {},
+                            icon: _isCameraEnabled ? Icons.videocam_rounded : Icons.videocam_off_rounded,
+                            title: _isCameraEnabled ? 'Kamera Aktif' : 'Kamera Tutup',
+                            isActive: _isCameraEnabled,
+                            activeColor: AppColors.primary,
+                            onTap: _toggleCamera,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -639,14 +886,7 @@ class _ScannerScreenState extends State<ScannerScreen>
 
                 // Web Server Status Card (Matching Mockup "Get Premium Today" Card)
                 InkWell(
-                  onTap: () async {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ApiSettingsScreen(),
-                      ),
-                    );
-                    _loadConfig();
-                  },
+                  onTap: _openApiSettings,
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1102,20 +1342,107 @@ class _BookPreviewBottomSheetState extends State<_BookPreviewBottomSheet> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          'ISBN: ${widget.isbn}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontFamily: 'monospace',
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primaryDark,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              'ISBN: ${widget.isbn}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primaryDark,
+                              ),
+                            ),
+                            if (_fetchResult!.book!.pageCount != null &&
+                                _fetchResult!.book!.pageCount! > 0) ...[
+                              const Text(
+                                ' • ',
+                                style: TextStyle(color: AppColors.textMuted),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 1.5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryLight,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: AppColors.primary.withAlpha(50),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.auto_stories_outlined,
+                                      size: 11,
+                                      color: AppColors.primaryDark,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      '${_fetchResult!.book!.pageCount} hlm',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primaryDark,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ],
                     ),
                   ),
                 ],
               ),
+
+              // Synopsis Preview (if available)
+              if (_fetchResult!.book!.resolvedSinopsis.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight.withAlpha(120),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primary.withAlpha(50)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.notes_rounded, size: 14, color: AppColors.primaryDark),
+                          SizedBox(width: 5),
+                          Text(
+                            'Sinopsis Buku',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primaryDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        _fetchResult!.book!.resolvedSinopsis,
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textPrimary,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
 
               // Action Buttons

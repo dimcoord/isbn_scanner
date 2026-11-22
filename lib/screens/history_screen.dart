@@ -58,9 +58,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
         final title = b.title.toLowerCase();
         final isbn = b.primaryIsbn.toLowerCase();
         final author = b.authorsFormatted.toLowerCase();
+        final sinopsis = b.resolvedSinopsis.toLowerCase();
         return title.contains(_searchQuery) ||
             isbn.contains(_searchQuery) ||
-            author.contains(_searchQuery);
+            author.contains(_searchQuery) ||
+            sinopsis.contains(_searchQuery);
       }).toList();
     }
 
@@ -526,7 +528,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
-                                      'ISBN: ${book.primaryIsbn} • ${_formatDate(book.scannedAt)}',
+                                      'ISBN: ${book.primaryIsbn}${book.pageCount != null && book.pageCount! > 0 ? ' • ${book.pageCount} hlm' : ''} • ${_formatDate(book.scannedAt)}',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
@@ -536,6 +538,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
+                                    if (book.resolvedSinopsis.isNotEmpty) ...[
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        book.resolvedSinopsis,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontStyle: FontStyle.italic,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                                 trailing: Row(

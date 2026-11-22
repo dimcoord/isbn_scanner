@@ -134,6 +134,7 @@ void main() {
         publicationYear: 2005,
         categoryId: 8,
         rackLocation: 'Rak-A1',
+        sinopsis: 'Bumi Manusia adalah roman sejarah karya Pramoedya Ananta Toer.',
         stock: 5,
         coverImage: 'https://example.com/covers/bumi-manusia.jpg',
         scannedAt: DateTime(2026, 9, 27),
@@ -148,6 +149,7 @@ void main() {
         'publication_year': 2005,
         'category_id': 8,
         'rack_location': 'Rak-A1',
+        'sinopsis': 'Bumi Manusia adalah roman sejarah karya Pramoedya Ananta Toer.',
         'stock': 5,
         'cover_image': 'https://example.com/covers/bumi-manusia.jpg',
       });
@@ -159,7 +161,7 @@ void main() {
       final headers = config.getResolvedHeaders();
       expect(
         headers['Authorization'],
-        'Bearer 2|xMfKgP7fOIHLvA7KpVjXl1Ijrg8bt3M1EaimTjtlccc0d98b',
+        'Bearer 6|poOhhfvNdjeMMr1F6xLPZUnN6LQnEODMGgtUMFk6f877a729',
       );
       expect(headers['Accept'], 'application/json');
       expect(headers['Content-Type'], 'application/json');
@@ -173,27 +175,23 @@ void main() {
       await tester.pumpWidget(const BookScannerApp());
       await tester.pump(const Duration(milliseconds: 100));
 
-      // Verify the 3 bottom navigation labels exist
-      expect(find.text('Scan'), findsOneWidget);
-      expect(find.text('History'), findsOneWidget);
-      expect(find.text('API Config'), findsOneWidget);
+      // Verify clean 2-tab navigation for school trial
+      expect(find.text('Pindai ISBN'), findsOneWidget);
+      expect(find.text('Riwayat Buku'), findsOneWidget);
+      expect(find.text('API Config'), findsNothing);
 
-      // Tap on History tab
-      await tester.tap(find.text('History'));
+      // Tap on Riwayat Buku tab
+      await tester.tap(find.text('Riwayat Buku'));
       await tester.pump(const Duration(milliseconds: 300));
 
       // Should display Scanned Books History title
       expect(find.text('Scanned Books History'), findsOneWidget);
       expect(find.text('No scanned books yet'), findsOneWidget);
 
-      // Tap on API Config tab
-      await tester.tap(find.text('API Config'));
-      await tester.pump(const Duration(milliseconds: 100));
-      await tester.pump(const Duration(milliseconds: 500));
-
-      // Should display API Endpoint Settings title
-      expect(find.text('API Endpoint Settings'), findsOneWidget);
-      expect(find.byTooltip('Save Settings'), findsOneWidget);
+      // Tap back to Pindai ISBN
+      await tester.tap(find.text('Pindai ISBN'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Perpus Dupat Scanner'), findsOneWidget);
     });
   });
 

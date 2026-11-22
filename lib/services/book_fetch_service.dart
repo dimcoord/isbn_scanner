@@ -79,78 +79,63 @@ class BookFetchService {
     return name.trim();
   }
 
+  /// Converts ISBN-13 (starting with 978) to its corresponding ISBN-10 representation, or returns null.
+  static String? isbn13ToIsbn10(String isbn13) {
+    final clean = cleanIsbn(isbn13);
+    if (clean.length != 13 || !clean.startsWith('978')) return null;
+    final core = clean.substring(3, 12); // 9 core digits
+    int sum = 0;
+    for (int i = 0; i < 9; i++) {
+      final digit = int.tryParse(core[i]);
+      if (digit == null) return null;
+      sum += digit * (10 - i);
+    }
+    final remainder = (11 - (sum % 11)) % 11;
+    final check = remainder == 10 ? 'X' : remainder.toString();
+    return '$core$check';
+  }
+
   /// Attempts to fetch book details with multi-source fallback.
-  /// For Indonesian books, queries Indonesia OneSearch (Perpusnas) first.
+  /// Queries Google Books first with deep fallbacks (fastest & most comprehensive),
+  /// then Indonesia OneSearch (Perpusnas), and Open Library.
   Future<BookFetchResult> fetchBookByIsbn(
     String rawIsbn, {
     String? googleApiKey,
   }) async {
     final isbn = cleanIsbn(rawIsbn);
     if (isbn.isEmpty) {
-      return const BookFetchResult(error: 'Invalid or empty ISBN code.');
+      return const BookFetchResult(error: 'Nomor ISBN tidak valid atau kosong.');
     }
 
-    final isIndo = isLikelyIndonesianIsbn(isbn);
+    // 1. Google Books (Sangat cepat ~300ms & database terlengkap untuk buku Indonesia & Dunia)
+    try {
+      final googleResult = await _fetchFromGoogleBooks(isbn, apiKey: googleApiKey);
+      if (googleResult != null) {
+        return BookFetchResult(book: googleResult, source: 'Google Books');
+      }
+    } catch (_) {}
 
-    if (isIndo) {
-      // 1. Indonesian Database: Indonesia OneSearch (Perpustakaan Nasional RI)
-      try {
-        final iosResult = await _fetchFromIndonesiaOneSearch(isbn);
-        if (iosResult != null) {
-          return BookFetchResult(
-            book: iosResult,
-            source: 'Indonesia OneSearch (Perpusnas)',
-          );
-        }
-      } catch (_) {}
+    // 2. Indonesia OneSearch (Katalog Nasional Perpustakaan RI)
+    try {
+      final iosResult = await _fetchFromIndonesiaOneSearch(isbn);
+      if (iosResult != null) {
+        return BookFetchResult(
+          book: iosResult,
+          source: 'Indonesia OneSearch (Perpusnas)',
+        );
+      }
+    } catch (_) {}
 
-      // 2. Open Library
-      try {
-        final openLibResult = await _fetchFromOpenLibrary(isbn);
-        if (openLibResult != null) {
-          return BookFetchResult(book: openLibResult, source: 'Open Library');
-        }
-      } catch (_) {}
-
-      // 3. Google Books
-      try {
-        final googleResult = await _fetchFromGoogleBooks(isbn, apiKey: googleApiKey);
-        if (googleResult != null) {
-          return BookFetchResult(book: googleResult, source: 'Google Books');
-        }
-      } catch (_) {}
-    } else {
-      // International flow
-      // 1. Google Books
-      try {
-        final googleResult = await _fetchFromGoogleBooks(isbn, apiKey: googleApiKey);
-        if (googleResult != null) {
-          return BookFetchResult(book: googleResult, source: 'Google Books');
-        }
-      } catch (_) {}
-
-      // 2. Open Library
-      try {
-        final openLibResult = await _fetchFromOpenLibrary(isbn);
-        if (openLibResult != null) {
-          return BookFetchResult(book: openLibResult, source: 'Open Library');
-        }
-      } catch (_) {}
-
-      // 3. Indonesia OneSearch fallback
-      try {
-        final iosResult = await _fetchFromIndonesiaOneSearch(isbn);
-        if (iosResult != null) {
-          return BookFetchResult(
-            book: iosResult,
-            source: 'Indonesia OneSearch (Perpusnas)',
-          );
-        }
-      } catch (_) {}
-    }
+    // 3. Open Library API fallback
+    try {
+      final openLibResult = await _fetchFromOpenLibrary(isbn);
+      if (openLibResult != null) {
+        return BookFetchResult(book: openLibResult, source: 'Open Library');
+      }
+    } catch (_) {}
 
     return BookFetchResult(
-      error: 'Book not found for ISBN $isbn. You can enter details manually.',
+      error: 'Data buku tidak ditemukan online untuk ISBN $isbn. Silakan masukkan data manual.',
       source: 'Not Found',
     );
   }
@@ -313,6 +298,14 @@ class BookFetchService {
           final parsedYear = int.tryParse(
               RegExp(r'\b(19\d\d|20\d\d)\b').firstMatch(publishDate)?.group(1) ?? '');
 
+          String openLibDesc = '';
+          final rawDesc = data['description'];
+          if (rawDesc is String) {
+            openLibDesc = rawDesc;
+          } else if (rawDesc is Map) {
+            openLibDesc = rawDesc['value']?.toString() ?? '';
+          }
+
           return Book(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
             isbn: isbn,
@@ -329,6 +322,8 @@ class BookFetchService {
             rackLocation: 'Rak-A1',
             stock: 5,
             coverImage: coverUrl,
+            description: openLibDesc,
+            sinopsis: openLibDesc,
             pageCount: pages,
             thumbnailUrl: coverUrl,
             scannedAt: DateTime.now(),
@@ -396,95 +391,124 @@ class BookFetchService {
     return null;
   }
 
-  /// Fetches from Google Books API
+  /// Fetches from Google Books API with multi-stage fallback:
+  /// 1. q=isbn:$isbn
+  /// 2. If ISBN-13, try converted ISBN-10 (q=isbn:$isbn10)
+  /// 3. General query fallback (q=$isbn)
   Future<Book?> _fetchFromGoogleBooks(String isbn, {String? apiKey}) async {
-    final queryUrl = apiKey != null && apiKey.trim().isNotEmpty
-        ? 'https://www.googleapis.com/books/v1/volumes?q=isbn:$isbn&key=${apiKey.trim()}'
-        : 'https://www.googleapis.com/books/v1/volumes?q=isbn:$isbn';
+    // Stage 1: Specific ISBN query
+    var book = await _queryGoogleBooks('isbn:$isbn', isbn, apiKey: apiKey);
+    if (book != null) return book;
 
-    final uri = Uri.parse(queryUrl);
-    final response = await _client.get(
-      uri,
-      headers: {'User-Agent': _defaultUserAgent},
-    ).timeout(const Duration(seconds: 10));
+    // Stage 2: Converted ISBN-10 query (if ISBN-13 starting with 978)
+    final isbn10 = isbn13ToIsbn10(isbn);
+    if (isbn10 != null) {
+      book = await _queryGoogleBooks('isbn:$isbn10', isbn, apiKey: apiKey);
+      if (book != null) return book;
+    }
 
-    if (response.statusCode != 200) return null;
+    // Stage 3: General keyword query without prefix
+    book = await _queryGoogleBooks(isbn, isbn, apiKey: apiKey);
+    if (book != null) return book;
 
-    final data = json.decode(response.body) as Map<String, dynamic>;
-    final totalItems = data['totalItems'] as int? ?? 0;
-    final items = data['items'] as List<dynamic>?;
+    return null;
+  }
 
-    if (totalItems == 0 || items == null || items.isEmpty) {
+  Future<Book?> _queryGoogleBooks(String query, String originalIsbn, {String? apiKey}) async {
+    final keyParam = apiKey != null && apiKey.trim().isNotEmpty
+        ? '&key=${apiKey.trim()}'
+        : '';
+    final queryUrl = 'https://www.googleapis.com/books/v1/volumes?q=$query$keyParam';
+
+    try {
+      final uri = Uri.parse(queryUrl);
+      final response = await _client.get(
+        uri,
+        headers: {'User-Agent': _defaultUserAgent},
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode != 200) return null;
+
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final totalItems = data['totalItems'] as int? ?? 0;
+      final items = data['items'] as List<dynamic>?;
+
+      if (totalItems == 0 || items == null || items.isEmpty) {
+        return null;
+      }
+
+      final firstItem = items.first as Map<String, dynamic>;
+      final volumeInfo = firstItem['volumeInfo'] as Map<String, dynamic>? ?? {};
+
+      String? isbn10;
+      String? isbn13;
+      final identifiers = volumeInfo['industryIdentifiers'] as List<dynamic>?;
+      if (identifiers != null) {
+        for (final idObj in identifiers) {
+          final type = idObj['type']?.toString();
+          final idVal = idObj['identifier']?.toString();
+          if (type == 'ISBN_10') isbn10 = idVal;
+          if (type == 'ISBN_13') isbn13 = idVal;
+        }
+      }
+
+      if (originalIsbn.length == 10) isbn10 ??= originalIsbn;
+      if (originalIsbn.length == 13) isbn13 ??= originalIsbn;
+
+      final authorsList = (volumeInfo['authors'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          <String>[];
+
+      final categoriesList = (volumeInfo['categories'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          <String>[];
+
+      String? thumb;
+      final images = volumeInfo['imageLinks'] as Map<String, dynamic>?;
+      if (images != null) {
+        thumb = images['thumbnail']?.toString() ??
+            images['smallThumbnail']?.toString();
+        if (thumb != null && thumb.startsWith('http://')) {
+          thumb = thumb.replaceFirst('http://', 'https://');
+        }
+      }
+
+      final pubDate = volumeInfo['publishedDate']?.toString() ?? '';
+      final parsedYear = int.tryParse(
+          RegExp(r'\b(19\d\d|20\d\d)\b').firstMatch(pubDate)?.group(1) ?? '');
+      final desc = volumeInfo['description']?.toString() ?? '';
+
+      return Book(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        isbn: originalIsbn,
+        isbn10: isbn10,
+        isbn13: isbn13,
+        title: volumeInfo['title']?.toString() ?? 'Untitled Book',
+        subtitle: volumeInfo['subtitle']?.toString() ?? '',
+        author: authorsList.isNotEmpty ? authorsList.first : '',
+        authors: authorsList,
+        publisher: volumeInfo['publisher']?.toString() ?? '',
+        publishedDate: pubDate,
+        publicationYear: parsedYear,
+        categoryId: 8,
+        rackLocation: 'Rak-A1',
+        stock: 5,
+        coverImage: thumb,
+        description: desc,
+        sinopsis: desc,
+        pageCount: volumeInfo['pageCount'] is int
+            ? volumeInfo['pageCount'] as int
+            : int.tryParse(volumeInfo['pageCount']?.toString() ?? ''),
+        categories: categoriesList,
+        language: volumeInfo['language']?.toString() ?? '',
+        thumbnailUrl: thumb,
+        scannedAt: DateTime.now(),
+        syncStatus: 'pending',
+      );
+    } catch (_) {
       return null;
     }
-
-    final firstItem = items.first as Map<String, dynamic>;
-    final volumeInfo = firstItem['volumeInfo'] as Map<String, dynamic>? ?? {};
-
-    String? isbn10;
-    String? isbn13;
-    final identifiers = volumeInfo['industryIdentifiers'] as List<dynamic>?;
-    if (identifiers != null) {
-      for (final idObj in identifiers) {
-        final type = idObj['type']?.toString();
-        final idVal = idObj['identifier']?.toString();
-        if (type == 'ISBN_10') isbn10 = idVal;
-        if (type == 'ISBN_13') isbn13 = idVal;
-      }
-    }
-
-    if (isbn.length == 10) isbn10 ??= isbn;
-    if (isbn.length == 13) isbn13 ??= isbn;
-
-    final authorsList = (volumeInfo['authors'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        <String>[];
-
-    final categoriesList = (volumeInfo['categories'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        <String>[];
-
-    String? thumb;
-    final images = volumeInfo['imageLinks'] as Map<String, dynamic>?;
-    if (images != null) {
-      thumb = images['thumbnail']?.toString() ??
-          images['smallThumbnail']?.toString();
-      if (thumb != null && thumb.startsWith('http://')) {
-        thumb = thumb.replaceFirst('http://', 'https://');
-      }
-    }
-
-    final pubDate = volumeInfo['publishedDate']?.toString() ?? '';
-    final parsedYear = int.tryParse(
-        RegExp(r'\b(19\d\d|20\d\d)\b').firstMatch(pubDate)?.group(1) ?? '');
-
-    return Book(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      isbn: isbn,
-      isbn10: isbn10,
-      isbn13: isbn13,
-      title: volumeInfo['title']?.toString() ?? 'Untitled Book',
-      subtitle: volumeInfo['subtitle']?.toString() ?? '',
-      author: authorsList.isNotEmpty ? authorsList.first : '',
-      authors: authorsList,
-      publisher: volumeInfo['publisher']?.toString() ?? '',
-      publishedDate: pubDate,
-      publicationYear: parsedYear,
-      categoryId: 8,
-      rackLocation: 'Rak-A1',
-      stock: 5,
-      coverImage: thumb,
-      description: volumeInfo['description']?.toString() ?? '',
-      pageCount: volumeInfo['pageCount'] is int
-          ? volumeInfo['pageCount'] as int
-          : int.tryParse(volumeInfo['pageCount']?.toString() ?? ''),
-      categories: categoriesList,
-      language: volumeInfo['language']?.toString() ?? '',
-      thumbnailUrl: thumb,
-      scannedAt: DateTime.now(),
-      syncStatus: 'pending',
-    );
   }
 }
